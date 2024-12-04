@@ -20,7 +20,7 @@ The documents are sent using [observability catalog](https://github.com/opensear
 ## Configuration options
 ### Indexing Options
 The Observability indices would follow the recommended pattern for immutable data stream ingestion using
-the [data_stream](https://opensearch.org/docs/latest/dashboards/im-dashboards/datastream) concepts.
+the [data_stream](https://opensearch.org/docs/latest/im-plugin/data-streams/) concepts.
 Index pattern will follow the next naming template `ss4o_{type}-{dataset}-{namespace}`
 - `dataset` (default=`default`) a user-provided label to classify source of telemetry. It is used to construct the name of the destination index or data stream.
 - `namespace` (default=`namespace`) a user-provided label to group telemetry. It is used to construct the name of the destination index or data stream.
