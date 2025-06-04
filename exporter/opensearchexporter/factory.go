@@ -36,6 +36,8 @@ func newDefaultConfig() component.Config {
 		BulkAction:       defaultBulkAction,
 		BackOffConfig:    configretry.NewDefaultBackOffConfig(),
 		MappingsSettings: MappingsSettings{Mode: defaultMappingMode},
+		DateSuffix:       false,
+		DynamicIndex:     false,
 	}
 }
 

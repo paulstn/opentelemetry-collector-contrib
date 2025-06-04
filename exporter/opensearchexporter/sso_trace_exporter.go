@@ -17,8 +17,7 @@ import (
 
 type ssoTracesExporter struct {
 	client       *opensearch.Client
-	Namespace    string
-	Dataset      string
+	Index        string
 	bulkAction   string
 	model        mappingModel
 	httpSettings confighttp.ClientConfig
@@ -33,8 +32,7 @@ func newSSOTracesExporter(cfg *Config, set exporter.Settings) *ssoTracesExporter
 
 	return &ssoTracesExporter{
 		telemetry:    set.TelemetrySettings,
-		Namespace:    cfg.Namespace,
-		Dataset:      cfg.Dataset,
+		Index:        getIndexName("ss4o_traces", cfg.Dataset, cfg.Namespace, cfg.TracesIndex, cfg.DateSuffix),
 		bulkAction:   cfg.BulkAction,
 		model:        model,
 		httpSettings: cfg.ClientConfig,
@@ -57,7 +55,7 @@ func (s *ssoTracesExporter) Start(ctx context.Context, host component.Host) erro
 }
 
 func (s *ssoTracesExporter) pushTraceData(ctx context.Context, td ptrace.Traces) error {
-	indexer := newTraceBulkIndexer(s.Dataset, s.Namespace, s.bulkAction, s.model)
+	indexer := newTraceBulkIndexer(s.Index, s.bulkAction, s.model)
 	startErr := indexer.start(s.client)
 	if startErr != nil {
 		return startErr

@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 
 	"github.com/opensearch-project/opensearch-go/v2"
 	"github.com/opensearch-project/opensearch-go/v2/opensearchutil"
@@ -18,16 +17,15 @@ import (
 )
 
 type traceBulkIndexer struct {
-	dataset     string
-	namespace   string
+	index       string
 	bulkAction  string
 	model       mappingModel
 	errs        []error
 	bulkIndexer opensearchutil.BulkIndexer
 }
 
-func newTraceBulkIndexer(dataset string, namespace string, bulkAction string, model mappingModel) *traceBulkIndexer {
-	return &traceBulkIndexer{dataset, namespace, bulkAction, model, nil, nil}
+func newTraceBulkIndexer(index string, bulkAction string, model mappingModel) *traceBulkIndexer {
+	return &traceBulkIndexer{index, bulkAction, model, nil, nil}
 }
 
 func (tbi *traceBulkIndexer) joinedError() error {
@@ -138,12 +136,8 @@ func shouldRetryEvent(status int) bool {
 
 func (tbi *traceBulkIndexer) newBulkIndexerItem(document []byte) opensearchutil.BulkIndexerItem {
 	body := bytes.NewReader(document)
-	item := opensearchutil.BulkIndexerItem{Action: tbi.bulkAction, Index: tbi.getIndexName(), Body: body}
+	item := opensearchutil.BulkIndexerItem{Action: tbi.bulkAction, Index: tbi.index, Body: body}
 	return item
-}
-
-func (tbi *traceBulkIndexer) getIndexName() string {
-	return strings.Join([]string{"ss4o_traces", tbi.dataset, tbi.namespace}, "-")
 }
 
 func newOpenSearchBulkIndexer(client *opensearch.Client, onIndexerError func(context.Context, error)) (opensearchutil.BulkIndexer, error) {
@@ -156,15 +150,15 @@ func newOpenSearchBulkIndexer(client *opensearch.Client, onIndexerError func(con
 
 func forEachSpan(td ptrace.Traces, visitor func(pcommon.Resource, string, pcommon.InstrumentationScope, string, ptrace.Span)) {
 	resourceSpans := td.ResourceSpans()
-	for i := 0; i < resourceSpans.Len(); i++ {
+	for i := range resourceSpans.Len() {
 		il := resourceSpans.At(i)
 		resource := il.Resource()
 		scopeSpans := il.ScopeSpans()
-		for j := 0; j < scopeSpans.Len(); j++ {
+		for j := range scopeSpans.Len() {
 			scopeSpan := scopeSpans.At(j)
 			spans := scopeSpans.At(j).Spans()
 
-			for k := 0; k < spans.Len(); k++ {
+			for k := range spans.Len() {
 				span := spans.At(k)
 				visitor(resource, il.SchemaUrl(), scopeSpan.Scope(), scopeSpan.SchemaUrl(), span)
 			}

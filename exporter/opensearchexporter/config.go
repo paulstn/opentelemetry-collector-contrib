@@ -44,10 +44,23 @@ type Config struct {
 	// https://opensearch.org/docs/latest/im-plugin/index/
 	// https://opensearch.org/docs/latest/dashboards/im-dashboards/datastream/
 	LogsIndex string `mapstructure:"logs_index"`
+	// TracesIndex configures the index, index alias, or data stream name traces should be indexed in.
+	TracesIndex string `mapstructure:"traces_index"`
 
 	// BulkAction configures the action for ingesting data. Only `create` and `index` are allowed here.
 	// If not specified, the default value `create` will be used.
 	BulkAction string `mapstructure:"bulk_action"`
+
+	// Use the logstash format - appends YYYY.MM.dd to index name
+	DateSuffix bool `mapstructure:"date_suffix"`
+
+	// TODO: add option to customize date format for logstash
+	// TODO: maybe also include a prefix separator? its an option
+
+	// Build a dynamic index name by using attributes within the log or trace
+	// Looks for data_stream.dataset and data_stream.namespace within the log record, then scope logs,
+	// then resource logs.
+	DynamicIndex bool `mapstructure:"dynamic_index"`
 }
 
 var (

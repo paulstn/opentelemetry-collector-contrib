@@ -5,7 +5,9 @@ package opensearchexporter // import "github.com/open-telemetry/opentelemetry-co
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/opensearch-project/opensearch-go/v2"
 	"go.opentelemetry.io/collector/component"
@@ -37,7 +39,7 @@ func newLogExporter(cfg *Config, set exporter.Settings) *logExporter {
 
 	return &logExporter{
 		telemetry:    set.TelemetrySettings,
-		Index:        getIndexName(cfg.Dataset, cfg.Namespace, cfg.LogsIndex),
+		Index:        getIndexName("ss4o_logs", cfg.Dataset, cfg.Namespace, cfg.LogsIndex, cfg.DateSuffix),
 		bulkAction:   cfg.BulkAction,
 		httpSettings: cfg.ClientConfig,
 		model:        model,
@@ -70,10 +72,20 @@ func (l *logExporter) pushLogData(ctx context.Context, ld plog.Logs) error {
 	return indexer.joinedError()
 }
 
-func getIndexName(dataset, namespace, index string) string {
+func getIndexName(indexType, dataset, namespace, index string, dateSuffix bool) string {
+	currentName := strings.Join([]string{indexType, dataset, namespace}, "-")
+
 	if len(index) != 0 {
-		return index
+		currentName = index
 	}
 
-	return strings.Join([]string{"ss4o_logs", dataset, namespace}, "-")
+	if dateSuffix {
+		now := time.Now()
+		year := now.Year()
+		month := int(now.Month())
+		day := now.Day()
+		currentName = strings.Join([]string{currentName, fmt.Sprintf("%04d.%02d.%02d", year, month, day)}, "-")
+	}
+
+	return currentName
 }

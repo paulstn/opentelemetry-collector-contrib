@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/opensearch-project/opensearch-go/v2"
 	"github.com/opensearch-project/opensearch-go/v2/opensearchutil"
@@ -61,6 +62,9 @@ func (lbi *logBulkIndexer) appendRetryLogError(err error, log plog.Logs) {
 func (lbi *logBulkIndexer) submit(ctx context.Context, ld plog.Logs) {
 	forEachLog(ld, func(resource pcommon.Resource, resourceSchemaURL string, scope pcommon.InstrumentationScope, scopeSchemaURL string, log plog.LogRecord) {
 		payload, err := lbi.model.encodeLog(resource, scope, scopeSchemaURL, log)
+		dataset, _ := lbi.constructDynamicIndex("data_stream.dataset", log.Attributes(), scope.Attributes(), resource.Attributes())
+		namespace, _ := lbi.constructDynamicIndex("data_stream.namespace", log.Attributes(), scope.Attributes(), resource.Attributes())
+
 		if err != nil {
 			lbi.appendPermanentError(err)
 		} else {
@@ -69,7 +73,7 @@ func (lbi *logBulkIndexer) submit(ctx context.Context, ld plog.Logs) {
 				// selective ACKing in the bulk response.
 				lbi.processItemFailure(resp, itemErr, makeLog(resource, resourceSchemaURL, scope, scopeSchemaURL, log))
 			}
-			bi := lbi.newBulkIndexerItem(payload)
+			bi := lbi.newBulkIndexerItem(payload, strings.Join([]string{"ss4o_logs", dataset, namespace}, "-"))
 			bi.OnFailure = ItemFailureHandler
 			err = lbi.bulkIndexer.Add(ctx, bi)
 			if err != nil {
@@ -109,9 +113,9 @@ func (lbi *logBulkIndexer) processItemFailure(resp opensearchutil.BulkIndexerRes
 	}
 }
 
-func (lbi *logBulkIndexer) newBulkIndexerItem(document []byte) opensearchutil.BulkIndexerItem {
+func (lbi *logBulkIndexer) newBulkIndexerItem(document []byte, index string) opensearchutil.BulkIndexerItem {
 	body := bytes.NewReader(document)
-	item := opensearchutil.BulkIndexerItem{Action: lbi.bulkAction, Index: lbi.index, Body: body}
+	item := opensearchutil.BulkIndexerItem{Action: lbi.bulkAction, Index: index, Body: body}
 	return item
 }
 
@@ -125,18 +129,27 @@ func newLogOpenSearchBulkIndexer(client *opensearch.Client, onIndexerError func(
 
 func forEachLog(ld plog.Logs, visitor func(pcommon.Resource, string, pcommon.InstrumentationScope, string, plog.LogRecord)) {
 	resourceLogs := ld.ResourceLogs()
-	for i := 0; i < resourceLogs.Len(); i++ {
+	for i := range resourceLogs.Len() {
 		il := resourceLogs.At(i)
 		resource := il.Resource()
 		scopeLogs := il.ScopeLogs()
-		for j := 0; j < scopeLogs.Len(); j++ {
+		for j := range scopeLogs.Len() {
 			scopeSpan := scopeLogs.At(j)
 			logs := scopeLogs.At(j).LogRecords()
 
-			for k := 0; k < logs.Len(); k++ {
+			for k := range logs.Len() {
 				log := logs.At(k)
 				visitor(resource, il.SchemaUrl(), scopeSpan.Scope(), scopeSpan.SchemaUrl(), log)
 			}
 		}
 	}
+}
+
+func (lbi *logBulkIndexer) constructDynamicIndex(wantedAttribute string, allAttributes ...pcommon.Map) (string, bool) {
+	for _, attributes := range allAttributes {
+		if value, ok := attributes.Get(wantedAttribute); ok {
+			return value.AsString(), true
+		}
+	}
+	return lbi.index, false
 }
